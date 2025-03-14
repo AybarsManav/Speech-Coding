@@ -1,0 +1,66 @@
+function test_huffman(original_test_signal, bits_per_sample, quantization_type, dict)
+% Quantize the signal similarly
+n_levels = 2 ^ bits_per_sample;
+
+if bits_per_sample ~= 16
+    n_levels = 2^bits_per_sample;
+    test_signal = double(original_test_signal) / 2^15; % [-1, 1]
+    test_signal = floor(test_signal * (n_levels / 2));
+else
+    test_signal = original_test_signal;
+end
+
+% Quantize using dpcm 
+if quantization_type == "dpcm"
+    audio_quantized = diff(test_signal);
+else
+    audio_quantized = test_signal;
+end
+
+%% Encoding + additional missing symbol handling
+tic;
+% Handle missing symbols in the codec by using the closest symbols to the
+% input symbols.
+train_symbols = cell2mat(dict(:, 1));
+test_symbols = unique(audio_quantized);
+missing_symbols = setdiff(test_symbols, train_symbols);
+abs_diffs = abs(missing_symbols - train_symbols');
+[~, indices] = min(abs_diffs, [], 2);
+closest_symbols = train_symbols(indices);
+
+extension = dict(:, 2); % Get the codewords
+% Get codewords corresponding to the closest symbols
+extension = [missing_symbols, extension(indices)];
+% Extend the dict, now more than one symbol will map to the same codeword
+extended_dict = [dict; extension];
+encoded_data = huffmanenco(audio_quantized, extended_dict);
+
+encode_time = toc;
+%% Decoding + use the original dictionary while decoding
+tic;
+decoded_data = huffmandeco(encoded_data, dict);
+decoded_time = toc;
+
+fprintf('Encoding Time: %.4f sec\n', encode_time);
+fprintf('Decoding Time: %.4f sec\n', decoded_time);
+
+% Reconstruction Error
+if quantization_type == "dpcm"
+    reconstructed_signal = cumsum([audio_quantized(1); decoded_data]);
+else
+    reconstructed_signal = decoded_data;
+end
+
+% To make reconstructed signal have the same scale as the original
+reconstructed_signal = double(reconstructed_signal) * 2^(16 - bits_per_sample);
+
+RMSE = sqrt(mean((reconstructed_signal  - double(original_test_signal)).^2 ));
+
+fprintf('RMSE = %.3f \n', RMSE);
+% Compression rate
+original_size = numel(original_test_signal) * 16; % Originally 16 bit per sample
+compressed_size = numel(encoded_data);
+
+compression_ratio = original_size / compressed_size;
+fprintf('compression_ratio = %.3f \n', compression_ratio);
+end
