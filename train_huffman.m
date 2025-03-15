@@ -18,6 +18,8 @@ if bits_per_sample ~= 16 || quantization_type ~= "uniform"
     n_levels = 2^bits_per_sample;
     train_signal = double(train_signal) / 2^15; % [-1, 1]
     audio_quantized = floor(train_signal * (n_levels / 2));
+else
+    audio_quantized = train_signal;
 end
 
 % Make a table to use groupcounts()
