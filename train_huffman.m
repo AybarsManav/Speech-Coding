@@ -6,18 +6,18 @@ for i = 1:train_size
     train_signal = [train_signal; train_signals{i}];
 end
 
-% Quantize with lower levels than 16 bits (originally 16)
-if bits_per_sample ~= 16
-    n_levels = 2^bits_per_sample;
-    train_signal = double(train_signal) / 2^15; % [-1, 1]
-    train_signal = floor(train_signal * (n_levels / 2));
+train_signal = double(train_signal);
+
+if quantization_type == "mu_law"
+    mu = 255;
+    train_signal = compand(train_signal, mu, max(abs(train_signal)), "mu/compressor");
 end
 
-% Quantize using dpcm 
-if quantization_type == "dpcm"
-    audio_quantized = diff(train_signal);
-else
-    audio_quantized = train_signal;
+% Quantize with lower levels than 16 bits (originally 16)
+if bits_per_sample ~= 16 || quantization_type ~= "uniform"
+    n_levels = 2^bits_per_sample;
+    train_signal = double(train_signal) / 2^15; % [-1, 1]
+    audio_quantized = floor(train_signal * (n_levels / 2));
 end
 
 % Make a table to use groupcounts()

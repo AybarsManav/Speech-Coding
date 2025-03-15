@@ -18,8 +18,8 @@ test_signals = audio_signals(rand_indices(train_size+1:end));
 
 %% 
 % Parameters could be: block-length, quantization level, quantization type
-bits_per_sample = 16;
-quantization_type = "uniform";
+bits_per_sample = 8;
+quantization_type = "mu_law";
 
 %% Train
 [dict, avg_length] = train_huffman(train_signals, bits_per_sample, quantization_type);

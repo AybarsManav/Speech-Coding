@@ -2,20 +2,20 @@ function test_huffman(original_test_signal, bits_per_sample, quantization_type, 
 % Quantize the signal similarly
 n_levels = 2 ^ bits_per_sample;
 
-if bits_per_sample ~= 16
-    n_levels = 2^bits_per_sample;
-    test_signal = double(original_test_signal) / 2^15; % [-1, 1]
-    test_signal = floor(test_signal * (n_levels / 2));
-else
-    test_signal = original_test_signal;
+test_signal = double(original_test_signal);
+if quantization_type == "mu_law"
+    mu = 255;
+    test_signal = compand(test_signal, mu, max(abs(test_signal)), "mu/compressor");
 end
 
-% Quantize using dpcm 
-if quantization_type == "dpcm"
-    audio_quantized = diff(test_signal);
+if bits_per_sample ~= 16 || quantization_type ~= "uniform"
+    n_levels = 2^bits_per_sample;
+    test_signal = double(test_signal) / 2^15; % [-1, 1]
+    audio_quantized = floor(test_signal * (n_levels / 2));
 else
     audio_quantized = test_signal;
 end
+
 
 %% Encoding + additional missing symbol handling
 tic;
@@ -39,17 +39,19 @@ encode_time = toc;
 %% Decoding + use the original dictionary while decoding
 tic;
 decoded_data = huffmandeco(encoded_data, dict);
-decoded_time = toc;
 
-fprintf('Encoding Time: %.4f sec\n', encode_time);
-fprintf('Decoding Time: %.4f sec\n', decoded_time);
-
-% Reconstruction Error
-if quantization_type == "dpcm"
-    reconstructed_signal = cumsum([audio_quantized(1); decoded_data]);
+if quantization_type == "mu_law"
+    reconstructed_signal = compand(decoded_data, mu, max(abs(decoded_data)), 'mu/expander');
 else
     reconstructed_signal = decoded_data;
 end
+
+% Reconstruction Error
+decoded_time = toc;
+
+
+fprintf('Encoding Time: %.4f sec\n', encode_time);
+fprintf('Decoding Time: %.4f sec\n', decoded_time);
 
 % To make reconstructed signal have the same scale as the original
 reconstructed_signal = double(reconstructed_signal) * 2^(16 - bits_per_sample);
