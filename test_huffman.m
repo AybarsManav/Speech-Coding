@@ -1,4 +1,4 @@
-function test_huffman(original_test_signal, symbols_per_sample, bits_per_symbol, quantization_type, dict, plot_stuff)
+function [space_save, snr, reconstructed_signal] = test_huffman(original_test_signal, symbols_per_sample, bits_per_symbol, quantization_type, dict, plot_stuff)
 % Quantize the signal similarly
 n_levels = 2 ^ bits_per_symbol;
 
@@ -67,21 +67,32 @@ fprintf('Decoding Time: %.4f sec\n', decoded_time);
 % To make reconstructed signal have the same scale as the original
 reconstructed_signal = double(reconstructed_signal) * 2^(16 - bits_per_symbol);
 
-RMSE = sqrt(mean((reconstructed_signal  - double(original_test_signal)).^2 ));
-fprintf('RMSE = %.3f \n', RMSE);
+MSE = mean((reconstructed_signal  - double(original_test_signal)).^2 );
+fprintf('MSE = %.3f \n', MSE);
+
+signal_power = sum((double(original_test_signal)).^2);
+noise_power = sum((double(original_test_signal) - reconstructed_signal).^2);
+snr = 10 * log10(signal_power) - 10 * log10(noise_power);
+fprintf('SNR = %.3f \n', snr);
 
 if plot_stuff
-    figure; 
-    subplot(2, 1, 1);
-    plot(original_test_signal, "Color", [1, 0, 0]); hold on;
-    plot(reconstructed_signal, "Color", [0, 0, 1]); hold off;
-    legend("Original Signal", "Reconstructed Signal");
-    title("Comparison");
-    x_limits = xlim;
-    subplot(2, 1, 2); 
-    bar((reconstructed_signal  - double(original_test_signal)).^2, "red");
-    title("Samplewise Squared Error");
-    xlim(x_limits);
+figure; 
+plot(original_test_signal, "Color", [0, 0, 1], 'LineWidth', 2.0); hold on;
+plot(reconstructed_signal, "Color", [1, 0, 0], 'LineWidth', 1.0); hold off;
+legend("Original Signal", "Reconstructed Signal", 'FontSize', 20); grid on;
+title("Comparison", 'FontSize', 25);
+xlabel("Sample Index", 'FontSize', 20);
+ylabel("Amplitude", 'FontSize', 20);
+set(gca, 'FontSize', 20);
+x_limits = xlim; 
+
+figure; 
+bar((reconstructed_signal  - double(original_test_signal)).^2, "red");
+title("Samplewise Squared Error", 'FontSize', 25); grid on;
+xlabel("Sample Index", 'FontSize', 20);
+ylabel("Squared Error", 'FontSize', 20);
+xlim(x_limits);
+set(gca, 'FontSize', 20);
 end
 
 % Compression rate
@@ -90,4 +101,18 @@ compressed_size = numel(encoded_data);
 
 compression_ratio = original_size / compressed_size;
 fprintf('compression_ratio = %.3f \n', compression_ratio);
+space_save =  1 - 1/compression_ratio;
+fprintf('space saving = %.3f \n', space_save);
+
+T = table(audio_quantized);
+grouped_data = groupcounts(T, 'audio_quantized');
+symbols = grouped_data.audio_quantized;
+counts = grouped_data.GroupCount;
+
+% Compute probabilities
+probabilities = counts' / sum(counts);
+
+% Compute entropy
+computed_entropy = computeEntropy(probabilities);
+fprintf("Entropy of the used test signal is %.2f\n", computed_entropy);
 end
