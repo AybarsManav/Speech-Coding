@@ -1,15 +1,22 @@
-function test_huffman(original_test_signal, bits_per_sample, quantization_type, dict, plot_stuff)
+function test_huffman(original_test_signal, symbols_per_sample, bits_per_symbol, quantization_type, dict, plot_stuff)
 % Quantize the signal similarly
-n_levels = 2 ^ bits_per_sample;
+n_levels = 2 ^ bits_per_symbol;
 
-test_signal = double(original_test_signal);
+% Seperate 16 bit symbols into 2 - 8 bits
+if symbols_per_sample == 2
+    test_signal = typecast(original_test_signal, "int8");
+else
+    test_signal = original_test_signal;
+end
+
+test_signal = double(test_signal);
 if quantization_type == "mu_law"
     mu = 255;
     test_signal = compand(test_signal, mu, max(abs(test_signal)), "mu/compressor");
 end
 
-if bits_per_sample ~= 16 || quantization_type ~= "uniform"
-    n_levels = 2^bits_per_sample;
+if bits_per_symbol ~= 16 || quantization_type ~= "uniform"
+    n_levels = 2^bits_per_symbol;
     test_signal = double(test_signal) / 2^15; % [-1, 1]
     audio_quantized = floor(test_signal * (n_levels / 2));
 else
@@ -46,6 +53,10 @@ else
     reconstructed_signal = decoded_data;
 end
 
+if symbols_per_sample == 2
+    reconstructed_signal = typecast(int8(reconstructed_signal), 'int16');
+end
+
 % Reconstruction Error
 decoded_time = toc;
 
@@ -54,7 +65,7 @@ fprintf('Encoding Time: %.4f sec\n', encode_time);
 fprintf('Decoding Time: %.4f sec\n', decoded_time);
 
 % To make reconstructed signal have the same scale as the original
-reconstructed_signal = double(reconstructed_signal) * 2^(16 - bits_per_sample);
+reconstructed_signal = double(reconstructed_signal) * 2^(16 - bits_per_symbol);
 
 RMSE = sqrt(mean((reconstructed_signal  - double(original_test_signal)).^2 ));
 fprintf('RMSE = %.3f \n', RMSE);
